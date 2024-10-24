@@ -18,7 +18,14 @@ typedef struct s_phil
 	int	times_to_satisfy;
 	int	stop_simul;
 	pthread_t	check_death;
-	pthread_mutex_t	waiter;
+	//writing on screen //AND PERM_TO_EAT?
+	pthread_mutex_t	m_status;
+	//writing on screen
+	pthread_mutex_t	m_write;
+	//check last_meal
+	pthread_mutex_t	m_meal;
+	//check if someone died
+	pthread_mutex_t	m_stop;
 }	t_phil;
 
 typedef struct s_list
@@ -28,7 +35,6 @@ typedef struct s_list
 	int	perm_to_eat;
 	suseconds_t	last_meal;
 	pthread_t	tid;
-	pthread_mutex_t p_mutex;
 	pthread_mutex_t f_mutex;
 	struct s_list	*next;
 	struct s_list	*prev;

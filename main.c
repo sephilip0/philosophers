@@ -3,32 +3,28 @@
 
 void	logmessage(t_list *table, char *msg)
 {
+	pthread_mutex_lock(&(table->info->m_write));
 	printf("%ld %d %s", gettimems(), table->id, msg);
+	pthread_mutex_unlock(&(table->info->m_write));
 }
 
 int	permission_to_eat(t_list *table)
 {
+	int	i;
+	i = 1;
+	//m_status already locked in waiter
 	pthread_mutex_lock(&(table->f_mutex));
 	pthread_mutex_lock(&(table->next->f_mutex));
-	pthread_mutex_lock(&(table->prev->p_mutex));
-	pthread_mutex_lock(&(table->next->p_mutex));
+	pthread_mutex_lock(&(table->info->m_meal));
 	if ((table->prev->status == 2
 		&& table->prev->last_meal > table->last_meal)
 		|| (table->next->status == 2
 		&& table->next->last_meal > table->last_meal))
-	{
-		pthread_mutex_unlock(&(table->f_mutex));
-		pthread_mutex_unlock(&(table->next->f_mutex));
-		pthread_mutex_unlock(&(table->prev->p_mutex));
-		pthread_mutex_unlock(&(table->next->p_mutex));
-		return (0);	
-
-	}
-	pthread_mutex_unlock(&(table->prev->f_mutex));
+		i = 0;	
+	pthread_mutex_lock(&(table->info->m_meal));
 	pthread_mutex_unlock(&(table->next->f_mutex));
-	pthread_mutex_unlock(&(table->prev->p_mutex));
-	pthread_mutex_unlock(&(table->next->p_mutex));
-	return (1);
+	pthread_mutex_unlock(&(table->f_mutex));
+	return (i);
 }
 
 void	*waiter(void *arg)
@@ -38,22 +34,21 @@ void	*waiter(void *arg)
 	table = (struct s_list*)arg;
 	while (1)
 	{
-		pthread_mutex_lock(&(table->p_mutex));
-		printf("-CURRENT ID:%d\n", table->id);
+		pthread_mutex_lock(&(table->info->m_status));
 		if (table->status == -1)
 		{
-			pthread_mutex_lock(&(table->info->waiter));
-			printf("WE WILL STOP THE SIMULATION\n");
+			pthread_mutex_lock(&(table->info->m_stop));
 			table->info->stop_simul = 1;
-			pthread_mutex_unlock(&(table->info->waiter));
+			pthread_mutex_unlock(&(table->info->m_stop));
 			return (NULL);
 		}
 		if (table->status == 2 && permission_to_eat(table))
 		{
-			printf("-ID: %d GOT PERMISSION TO EAT\n", table->id);
+			//lock perm_to_eat
 			table->perm_to_eat = 1;
+			//unlock perm_to_eat
 		}
-		pthread_mutex_unlock(&(table->p_mutex));
+		pthread_mutex_unlock(&(table->info->m_status));
 		table = table->next;
 		usleep(1000); 
 	}
@@ -75,6 +70,8 @@ void	alertsleep(suseconds_t timer, t_list *table)
 	start = gettimems();
 	while (1)
 	{
+		//inside routine, no need to lock status
+		
 		if (table->status != 2
 			&& (gettimems() - start >= table->info->time_to_die))
 		{
@@ -124,21 +121,22 @@ void	*routine(void* arg)
 
 	times_eaten = 0;
 	table = (struct s_list*)arg;
-	pthread_mutex_lock(&(table->info->waiter));
-	pthread_mutex_unlock(&(table->info->waiter));
 	while (1)
 	{
-		pthread_mutex_lock(&(table->info->waiter));
+		pthread_mutex_lock(&(table->info->m_stop));
 		if (table->info->stop_simul) //status == 0?
 		{
-			pthread_mutex_unlock(&(table->info->waiter));
+			pthread_mutex_unlock(&(table->info->m_stop));
 			break ;
-			//return (NULL);
 		}
-		pthread_mutex_unlock(&(table->info->waiter));
-		pthread_mutex_lock(&(table->p_mutex));
+		pthread_mutex_unlock(&(table->info->m_stop));
 		if (times_eaten == table->info->times_to_satisfy)
+		{
+			pthread_mutex_lock(&(table->info->m_status));
 			table->status = 0;
+			pthread_mutex_unlock(&(table->info->m_status));
+		}
+		//lock perm_to_eat
 		if (table->status == 1 && table->perm_to_eat)
 		{
 			//eat;
@@ -156,6 +154,7 @@ void	*routine(void* arg)
 			pthread_mutex_unlock(&(table->f_mutex));
 			pthread_mutex_unlock(&(table->next->f_mutex));
 		}
+		//unlock perm_to_eat
 		pthread_mutex_unlock(&(table->p_mutex));
 		if (table->status == 3)
 		{
