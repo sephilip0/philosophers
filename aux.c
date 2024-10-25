@@ -91,7 +91,6 @@ void	freelist(t_list **list, int nbr)
 		tmp = (*list);
 		(*list) = (*list)->next;
 		printf("DESTRUIDO MUTEX\n");
-		pthread_mutex_destroy(&(tmp->p_mutex));
 		pthread_mutex_destroy(&(tmp->f_mutex));
 		free(tmp);
 		i++;
@@ -117,15 +116,10 @@ t_list	*formlist(t_phil *phil)
 		new->id = i;
 		new->status = 1;
 		new->perm_to_eat = 0;
+		new->last_meal = 0;
 		new->info = phil;
 		new->next = first;
 		new->prev = prev;
-		printf("CRIADO MUTEX\n");
-		printf("NEW: %p\n", new);
-		printf("NEW ID: %d\n", new->id);
-		printf("NEW PREV: %p\n", new->prev);
-		printf("NEW NEXT: %p\n", new->next);
-		pthread_mutex_init(&(new->p_mutex), NULL);
 		pthread_mutex_init(&(new->f_mutex), NULL);
 		if (!first)
 			first = new;
@@ -136,10 +130,9 @@ t_list	*formlist(t_phil *phil)
 			prev->next = new;
 			prev = new;
 		}
-		printf("ACTUAL PREV %p\n", prev);
-		printf("ACTUAL FIRST %p\n", first);
 		i++;
 	}
+	first->prev = new;
 	return (first);
 }
 
@@ -154,6 +147,14 @@ void	spinbottle(t_list *head)
 		head = head->next;
 		i++;
 	}
+	printf("now to back\n");
+	i = 0;
+	while (i < 20)
+	{
+		printf("%d\n", head->id);
+		head = head->prev;
+		i++;
+	}
 }
 
 t_list	*initphil(t_phil *phil, int argc, char *argv[])
@@ -164,7 +165,15 @@ t_list	*initphil(t_phil *phil, int argc, char *argv[])
 	phil->time_to_die = ft_atoi(argv[2]);
 	phil->time_to_eat = ft_atoi(argv[3]);
 	phil->time_to_sleep = ft_atoi(argv[4]);
-	pthread_mutex_init(&(phil->waiter), NULL);
+	phil->stop_simul = 0;
+	printf("M_STATUS INIT\n");
+	pthread_mutex_init(&(phil->m_status), NULL);
+	printf("M_WRITE INIT\n");
+	pthread_mutex_init(&(phil->m_write), NULL);
+	printf("M_MEAL INIT\n");
+	pthread_mutex_init(&(phil->m_meal), NULL);
+	printf("M_STOP INIT\n");
+	pthread_mutex_init(&(phil->m_stop), NULL);
 	if (argc == 6)
 		phil->times_to_satisfy = ft_atoi(argv[5]);
 	else

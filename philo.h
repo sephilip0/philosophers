@@ -18,13 +18,13 @@ typedef struct s_phil
 	int	times_to_satisfy;
 	int	stop_simul;
 	pthread_t	check_death;
-	//writing on screen //AND PERM_TO_EAT?
+	//writing on screen //AND PERM_TO_EAT? //protect from waiter
 	pthread_mutex_t	m_status;
-	//writing on screen
+	//writing on screen //protect from other philo on writing in the screen atst
 	pthread_mutex_t	m_write;
-	//check last_meal
+	//check last_meal //protect between waiter and philo
 	pthread_mutex_t	m_meal;
-	//check if someone died
+	//check if someone died //protect between waiter and philo
 	pthread_mutex_t	m_stop;
 }	t_phil;
 
@@ -41,10 +41,11 @@ typedef struct s_list
 	struct s_phil	*info;
 }	t_list;
 
+suseconds_t	gettimems(void);
+suseconds_t	simul_time(t_list *table);
 void	logmessage(t_list *table, char *msg);
 int	permission_to_eat(t_list *table);
 void	*waiter(void *arg);
-suseconds_t	gettimems(void);
 void	alertsleep(suseconds_t timer, t_list *table);
 void	*routine(void* arg);
 int	startroullete(t_list *table);

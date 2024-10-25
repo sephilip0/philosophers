@@ -1,10 +1,16 @@
 #include "philo.h"
 
-
 void	logmessage(t_list *table, char *msg)
 {
 	pthread_mutex_lock(&(table->info->m_write));
-	printf("%ld %d %s", gettimems(), table->id, msg);
+	printf("%ld %d %s", simul_time(table), table->id, msg);
+	pthread_mutex_unlock(&(table->info->m_write));
+}
+
+void	logvalue(t_list *table, char *msg, long int value)
+{
+	pthread_mutex_lock(&(table->info->m_write));
+	printf("%ld %d %s %ld\n", simul_time(table), table->id, msg, value);
 	pthread_mutex_unlock(&(table->info->m_write));
 }
 
@@ -16,11 +22,18 @@ int	permission_to_eat(t_list *table)
 	pthread_mutex_lock(&(table->f_mutex));
 	pthread_mutex_lock(&(table->next->f_mutex));
 	pthread_mutex_lock(&(table->info->m_meal));
-	if ((table->prev->status == 2
+	//printf("0\n");
+	//printf("01\n");
+	if ((table->prev->status == 1
 		&& table->prev->last_meal > table->last_meal)
-		|| (table->next->status == 2
+		|| (table->next->status == 1
 		&& table->next->last_meal > table->last_meal))
 		i = 0;	
+	//printf("02\n");
+	logvalue(table, "prev last meal", table->prev->last_meal);
+	logvalue(table, "act last meal", table->last_meal);
+	logvalue(table, "next last meal", table->next->last_meal);
+	logvalue(table, "i", i);
 	pthread_mutex_lock(&(table->info->m_meal));
 	pthread_mutex_unlock(&(table->next->f_mutex));
 	pthread_mutex_unlock(&(table->f_mutex));
@@ -34,23 +47,23 @@ void	*waiter(void *arg)
 	table = (struct s_list*)arg;
 	while (1)
 	{
+		logvalue(table, "waiter", 0);
 		pthread_mutex_lock(&(table->info->m_status));
-		if (table->status == -1)
+		if (table->status == 1 && permission_to_eat(table))
+			table->perm_to_eat = 1;
+		pthread_mutex_lock(&(table->info->m_meal));
+		if (table->status != 2 
+			&& (simul_time(table) - table->last_meal >= table->info->time_to_die))
 		{
+			logmessage(table, "died\n");
 			pthread_mutex_lock(&(table->info->m_stop));
 			table->info->stop_simul = 1;
 			pthread_mutex_unlock(&(table->info->m_stop));
 			return (NULL);
 		}
-		if (table->status == 2 && permission_to_eat(table))
-		{
-			//lock perm_to_eat
-			table->perm_to_eat = 1;
-			//unlock perm_to_eat
-		}
+		pthread_mutex_unlock(&(table->info->m_meal));
 		pthread_mutex_unlock(&(table->info->m_status));
 		table = table->next;
-		usleep(1000); 
 	}
 	return (NULL);
 }
@@ -63,52 +76,101 @@ suseconds_t	gettimems(void)
 	return ((tv.tv_sec * 1000) + (tv.tv_usec / 1000));
 }
 
+suseconds_t	simul_time(t_list *table)
+{
+	return (gettimems() - table->info->start_time);
+}
+
 void	alertsleep(suseconds_t timer, t_list *table)
 {
 	suseconds_t	start;
 
-	start = gettimems();
+	start = simul_time(table);
 	while (1)
 	{
 		//inside routine, no need to lock status
-		
-		if (table->status != 2
-			&& (gettimems() - start >= table->info->time_to_die))
-		{
-			logmessage(table, "died\n");
-			table->status = -1; 
-			return ;
-		}
+		pthread_mutex_lock(&(table->info->m_stop));
 		if (table->info->stop_simul)
 		{
 			table->status = 0;
-			return ;;
+			return ;
 		}
-		if (gettimems() - start >= timer)
+		pthread_mutex_unlock(&(table->info->m_stop));
+		if (simul_time(table) - start >= timer)
 			break ;
 		//while doing stuff, every 100ms check for uptades about if anyone died
 		usleep(100);
 	}
 	return ;
 }
-/*
-void	pickfork(t_list *table)
+
+int	end_of_simulation(t_list *table)
 {
-	//ask waiter if forks are available
-	if (permission_to_eat(table))
-	{
-		printf("STARTED EATING\n");
-		alertsleep(table->info->time_to_sleep, table);
-	}
+	int	value;
+
+	value = 0;
+
+	logmessage(table, "end_of_simulation\n");
+	pthread_mutex_lock(&(table->info->m_stop));
+	if (table->info->stop_simul) //status == 0?
+		value = 1;
+	pthread_mutex_unlock(&(table->info->m_stop));
+	return (value);
 }
 
-
-
-void	dropfork()
+void	sleepthink(t_list *table)
 {
+	if (end_of_simulation(table))
+		return ;
+	pthread_mutex_lock(&(table->info->m_status));
+	if (table->status == 3)
+	{
+		logmessage(table, "is sleeping\n");
+		alertsleep(table->info->time_to_sleep, table);
+		table->status = 1;
+		logmessage(table, "is thinking\n");
+	}
+	pthread_mutex_unlock(&(table->info->m_status));
+	return ;
+}
 
-	
-}*/
+int	readyeat(t_list *table)
+{
+	int	value;
+
+	value = 0;
+	if (end_of_simulation(table))
+		return (value);
+	pthread_mutex_lock(&(table->info->m_status));
+	logvalue(table, "readyyeat", table->status);
+	if (table->status == 1 && table->perm_to_eat)
+	{
+		//eat;
+		pthread_mutex_lock(&(table->f_mutex));
+		logmessage(table, "has taken a left fork\n");
+		pthread_mutex_lock(&(table->next->f_mutex));
+		logmessage(table, "has taken a right fork\n");
+		table->status = 2;
+	}
+	pthread_mutex_unlock(&(table->info->m_status));
+	pthread_mutex_lock(&(table->info->m_status));
+	if (table->status == 2)
+	{
+		logmessage(table, "is eating\n");
+		alertsleep(table->info->time_to_eat, table);
+		pthread_mutex_lock(&(table->info->m_meal));
+		printf("BROOOOWTF\n\n");
+		table->last_meal = simul_time(table);
+		pthread_mutex_unlock(&(table->info->m_meal));
+		pthread_mutex_unlock(&(table->next->f_mutex));
+		pthread_mutex_unlock(&(table->f_mutex));
+		table->status = 3;
+		table->perm_to_eat = 0;
+		value++;
+	}
+	pthread_mutex_unlock(&(table->info->m_status));
+	return (value);
+}
 
 //status 0 = DEAD
 //status 1 = THINKING
@@ -123,125 +185,33 @@ void	*routine(void* arg)
 	table = (struct s_list*)arg;
 	while (1)
 	{
-		pthread_mutex_lock(&(table->info->m_stop));
-		if (table->info->stop_simul) //status == 0?
-		{
-			pthread_mutex_unlock(&(table->info->m_stop));
+		//logmessage(table, "routine\n");
+		if (end_of_simulation(table))
 			break ;
-		}
-		pthread_mutex_unlock(&(table->info->m_stop));
-		if (times_eaten == table->info->times_to_satisfy)
+		if (table->info->times_to_satisfy != 0
+			&& times_eaten == table->info->times_to_satisfy)
 		{
 			pthread_mutex_lock(&(table->info->m_status));
 			table->status = 0;
 			pthread_mutex_unlock(&(table->info->m_status));
 		}
-		//lock perm_to_eat
-		if (table->status == 1 && table->perm_to_eat)
-		{
-			//eat;
-			pthread_mutex_lock(&(table->f_mutex));
-			logmessage(table, "has taken a left fork\n");
-			pthread_mutex_lock(&(table->next->f_mutex));
-			logmessage(table, "has taken a right fork\n");
-			table->status = 2;
-			logmessage(table, "is eating\n");
-			alertsleep(table->info->time_to_eat, table);
-			table->last_meal = gettimems();
-			table->status = 3;
-			table->perm_to_eat = 0;
-			times_eaten++;
-			pthread_mutex_unlock(&(table->f_mutex));
-			pthread_mutex_unlock(&(table->next->f_mutex));
-		}
-		//unlock perm_to_eat
-		pthread_mutex_unlock(&(table->p_mutex));
-		if (table->status == 3)
-		{
-			logmessage(table, "is sleeping\n");
-			alertsleep(table->info->time_to_sleep, table);
-			pthread_mutex_lock(&(table->p_mutex));
-			table->status = 1;
-			logmessage(table, "is thinking\n");
-			pthread_mutex_unlock(&(table->p_mutex));
-		}
+		times_eaten += readyeat(table);
+		sleepthink(table);
+		pthread_mutex_lock(&(table->info->m_status));
 		if (table->status == 0) //simulation ender or safisfied
+		{
+			pthread_mutex_unlock(&(table->info->m_status));
+			pthread_mutex_lock(&(table->info->m_write));
+			printf("CU\n");
+			pthread_mutex_unlock(&(table->info->m_write));
 			break ;
-	}
-	return (NULL);
-}
-
-/*
-	while (!table->philos->eatcheck || i < table->philos->eatcheck)
-	{
-		if (status == 1)
-		{
-			pthread_mutex_lock(&(table->forks->mutex));
-			if (table->forks->status == 1)
-			{
-				pthread_mutex_lock(&(table->forks->next->mutex));
-				if (table->forks->next->status == 1)
-				{
-					table->forks->status = 0;
-					table->forks->next->status = 0;
-					pthread_mutex_lock(&(table->phil->mutex));
-					table->philos->status = 2;
-					pthread_mutex_unlock(&(table->phil->mutex));
-					usleep(table->eattime);
-					table->forks->status = 1;
-					table->forks->next->status = 1;
-				
-				}
-				pthread_mutex_unlock(&(table->forks->next->mutex));
-			}
-			pthread_mutex_unlock(&(table->forks->mutex));
 		}
-		if (status == 2)
-		{
-			pthread_mutex_lock(&(table->phil->mutex));
-			table->philos->status = 3;
-			pthread_mutex_unlock(&(table->phil->mutex));
-			table->philos->et = gettimeofday;
-		}
-		if (status == 3)
-		{
-			usleep(sleeptime);
-			pthread_mutex_lock(&(table->phil->mutex));
-				table->philos->status = 1;
-			pthread_mutex_unlock(&(table->phil->mutex));
-		}
-		i++;
+		pthread_mutex_unlock(&(table->info->m_status));
+		usleep(100);
 	}
-	return (NULL);
-}*/
-
-void	*test_routine(void* arg)
-{
-	t_list	*table;
-	int	i;
-
-	table = (struct s_list*)arg;
-	i = 0;
-	while (i < 40)
-	{
-		printf("DENTRO DA ROTINA %d\n", table->id);
-		i++;
-	}
-	return (NULL);
-}
-
-void	*test_waiter(void *arg)
-{
-	t_list	*table;
-	int i;
-
-	table = (struct s_list*)arg;
-	i = 0;
-	while (i < 3)
-	{
-		printf("DENTRO DO WAITER %d\n", table->id);
-		i++;
-	}
+	pthread_mutex_lock(&(table->info->m_write));
+	printf("ANOS\n");
+	pthread_mutex_unlock(&(table->info->m_write));
 	return (NULL);
 }
 
@@ -251,19 +221,19 @@ int	startroullete(t_list *table)
 	t_list *tmp;
 
 	i = 0;
-	table->info->start_time = gettimems();
+	table->info->start_time = 0;
 	tmp = table;
+	printf("table->info->start_time: %ld\n", table->info->start_time);
 	while (i < table->info->number_of_philo)
 	{
-		printf("FOI THREAD: %d\n", tmp->id);
-		tmp->last_meal = table->info->start_time;
+		printf("ID %d lastmeal: %ld\n", tmp->id, tmp->last_meal);
 		if (pthread_create(&(tmp->tid), NULL, &routine, tmp) != 0)
 			perror("FAILED TO CREATE THREAD\n");
 		tmp = tmp->next;
 		i++;
 	}
-	printf("EXTRA THREAD: %d\n", tmp->id);
-	usleep(table->info->number_of_philo + 1);
+	usleep(table->info->number_of_philo);
+	table->info->start_time = gettimems();
 	if (pthread_create(&(table->info->check_death), NULL, &waiter, table) != 0)
 		perror("FAILED TO CREATE THREAD WITH WAITER\n");
 	i = 0;
@@ -278,7 +248,10 @@ int	startroullete(t_list *table)
 	printf("FECHOU EXTRA THREAD: %d\n", tmp->id);
 	if (pthread_join(table->info->check_death, NULL) != 0)
 		perror("FAILED TO JOIN THREAD CHECK_DEATH\n");
-	pthread_mutex_destroy(&(tmp->info->waiter));
+	pthread_mutex_destroy(&(tmp->info->m_status));
+	pthread_mutex_destroy(&(tmp->info->m_write));
+	pthread_mutex_destroy(&(tmp->info->m_meal));
+	pthread_mutex_destroy(&(tmp->info->m_stop));
 	return (0);
 }
 
