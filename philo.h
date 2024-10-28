@@ -18,8 +18,10 @@ typedef struct s_phil
 	int	times_to_satisfy;
 	int	stop_simul;
 	pthread_t	check_death;
+	//permission to eat
+	pthread_mutex_t	m_pte;
 	//writing on screen //AND PERM_TO_EAT? //protect from waiter
-	pthread_mutex_t	m_status;
+	pthread_mutex_t	m_hungry;
 	//writing on screen //protect from other philo on writing in the screen atst
 	pthread_mutex_t	m_write;
 	//check last_meal //protect between waiter and philo
@@ -31,7 +33,7 @@ typedef struct s_phil
 typedef struct s_list
 {
 	int	id;
-	int	status;
+	int	hungry;
 	int	perm_to_eat;
 	suseconds_t	last_meal;
 	pthread_t	tid;

@@ -114,7 +114,7 @@ t_list	*formlist(t_phil *phil)
 		if (!new)
 			return (freelist(&new, i - 1), NULL);
 		new->id = i;
-		new->status = 1;
+		new->hungry = 1;
 		new->perm_to_eat = 0;
 		new->last_meal = 0;
 		new->info = phil;
@@ -166,8 +166,10 @@ t_list	*initphil(t_phil *phil, int argc, char *argv[])
 	phil->time_to_eat = ft_atoi(argv[3]);
 	phil->time_to_sleep = ft_atoi(argv[4]);
 	phil->stop_simul = 0;
+	printf("M_PTE INIT\n");
+	pthread_mutex_init(&(phil->m_pte), NULL);
 	printf("M_STATUS INIT\n");
-	pthread_mutex_init(&(phil->m_status), NULL);
+	pthread_mutex_init(&(phil->m_hungry), NULL);
 	printf("M_WRITE INIT\n");
 	pthread_mutex_init(&(phil->m_write), NULL);
 	printf("M_MEAL INIT\n");
