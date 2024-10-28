@@ -61,22 +61,25 @@ void	*waiter(void *arg)
 				pthread_mutex_unlock(&(table->info->m_pte));
 			}
 		}
-
+		pthread_mutex_lock(&(table->info->m_pte));
 		pthread_mutex_lock(&(table->info->m_meal));
-		//hungry 0 is when he is ready to eat
-		if (table->hungry == 0 && simul_time(table) - table->last_meal >= table->info->time_to_die)
+		if (!(table->hungry == 0 && table->perm_to_eat == 1)
+		&& (simul_time(table) - table->last_meal >= table->info->time_to_die))
 		{
 			logvalue(table, "last_meal ", table->last_meal);
+			logvalue(table, "permtoeat? ", table->perm_to_eat);
 			logvalue(table, "hungry? ", table->hungry);
+			pthread_mutex_unlock(&(table->info->m_meal));
+			pthread_mutex_unlock(&(table->info->m_pte));
+			pthread_mutex_unlock(&(table->info->m_hungry));
 			logmessage(table, "died\n");
 			pthread_mutex_lock(&(table->info->m_stop));
 			table->info->stop_simul = 1;
 			pthread_mutex_unlock(&(table->info->m_stop));
-			pthread_mutex_unlock(&(table->info->m_meal));
-			pthread_mutex_unlock(&(table->info->m_hungry));
 			return (NULL);
 		}
 		pthread_mutex_unlock(&(table->info->m_meal));
+		pthread_mutex_unlock(&(table->info->m_pte));
 		pthread_mutex_unlock(&(table->info->m_hungry));
 		table = table->next;
 	}
@@ -147,6 +150,9 @@ int	readyeat(t_list *table)
 			pthread_mutex_lock(&(table->info->m_hungry));
 			table->hungry = 0;
 			pthread_mutex_unlock(&(table->info->m_hungry));
+		pthread_mutex_lock(&(table->info->m_meal));
+		logvalue(table, "LAST MEAL MAN ", table->last_meal);
+		pthread_mutex_unlock(&(table->info->m_meal));
 		logmessage(table, "has taken a left fork\n");
 		logmessage(table, "has taken a right fork\n");
 		logmessage(table, "is eating\n");
