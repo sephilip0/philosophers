@@ -28,8 +28,16 @@ int	permission_to_eat(t_list *table)
 	if ((table->prev->perm_to_eat == 1) || (table->next->perm_to_eat == 1))
 		i = 0;
 	else if (table->prev->last_meal < table->last_meal
-		|| table->prev->last_meal < table->last_meal)
+		|| table->next->last_meal < table->last_meal)
+	{
 		i = 0;
+	}
+	/*else
+	{
+		logvalue(table, "last_meal_prev: ", table->prev->last_meal);
+		logvalue(table, "last_meal: ", table->last_meal);
+		logvalue(table, "last_meal_next: ", table->next->last_meal);
+	}*/
 	pthread_mutex_unlock(&(table->info->m_pte));
 	pthread_mutex_unlock(&(table->info->m_meal));
 	return (i);
@@ -48,24 +56,28 @@ void	*waiter(void *arg)
 			if (permission_to_eat(table))
 			{
 				pthread_mutex_lock(&(table->info->m_pte));
+			//	logvalue(table, "permtoeat", 1);
 				table->perm_to_eat = 1;
 				pthread_mutex_unlock(&(table->info->m_pte));
 			}
 		}
-		pthread_mutex_unlock(&(table->info->m_hungry));
 
 		pthread_mutex_lock(&(table->info->m_meal));
-		//if not eating deleted for now
-		if (simul_time(table) - table->last_meal >= table->info->time_to_die)
+		//hungry 0 is when he is ready to eat
+		if (table->hungry == 0 && simul_time(table) - table->last_meal >= table->info->time_to_die)
 		{
+			logvalue(table, "last_meal ", table->last_meal);
+			logvalue(table, "hungry? ", table->hungry);
 			logmessage(table, "died\n");
 			pthread_mutex_lock(&(table->info->m_stop));
 			table->info->stop_simul = 1;
 			pthread_mutex_unlock(&(table->info->m_stop));
 			pthread_mutex_unlock(&(table->info->m_meal));
+			pthread_mutex_unlock(&(table->info->m_hungry));
 			return (NULL);
 		}
 		pthread_mutex_unlock(&(table->info->m_meal));
+		pthread_mutex_unlock(&(table->info->m_hungry));
 		table = table->next;
 	}
 	return (NULL);
@@ -128,19 +140,25 @@ int	readyeat(t_list *table)
 	pthread_mutex_lock(&(table->info->m_pte));
 	if (table->perm_to_eat)
 	{
-		table->perm_to_eat = 0;
+		//table->perm_to_eat = 0;
 		pthread_mutex_unlock(&(table->info->m_pte));
 		pthread_mutex_lock(&(table->f_mutex));
 		pthread_mutex_lock(&(table->next->f_mutex));
+			pthread_mutex_lock(&(table->info->m_hungry));
+			table->hungry = 0;
+			pthread_mutex_unlock(&(table->info->m_hungry));
 		logmessage(table, "has taken a left fork\n");
 		logmessage(table, "has taken a right fork\n");
 		logmessage(table, "is eating\n");
 		alertsleep(table->info->time_to_eat, table);
 		pthread_mutex_unlock(&(table->next->f_mutex));
 		pthread_mutex_unlock(&(table->f_mutex));
-			pthread_mutex_lock(&(table->info->m_meal));
-			table->last_meal = simul_time(table);
-			pthread_mutex_unlock(&(table->info->m_meal));
+		pthread_mutex_lock(&(table->info->m_meal));
+		table->last_meal = simul_time(table);
+		pthread_mutex_unlock(&(table->info->m_meal));
+			pthread_mutex_lock(&(table->info->m_pte));
+			table->perm_to_eat = 0;
+			pthread_mutex_unlock(&(table->info->m_pte));
 		logmessage(table, "is sleeping\n");
 		alertsleep(table->info->time_to_sleep, table);
 		logmessage(table, "is thinking\n");
