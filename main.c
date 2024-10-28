@@ -17,26 +17,31 @@ void	logvalue(t_list *table, char *msg, long int value)
 int	permission_to_eat(t_list *table)
 {
 	int	i;
+
 	i = 1;
 	//m_status already locked in waiter
-	pthread_mutex_lock(&(table->f_mutex));
-	pthread_mutex_lock(&(table->next->f_mutex));
+	if (table->perm_to_eat == 1)
+		return (1);
+	//pthread_mutex_lock(&(table->f_mutex));
+	//pthread_mutex_lock(&(table->next->f_mutex));
 	pthread_mutex_lock(&(table->info->m_meal));
 	//printf("0\n");
 	//printf("01\n");
+	//if ((table->prev->perm_to_eat == 1) || (table->next->perm_to_eat == 1))
+//		i = 0;
 	if ((table->prev->status == 1
 		&& table->prev->last_meal > table->last_meal)
 		|| (table->next->status == 1
 		&& table->next->last_meal > table->last_meal))
-		i = 0;	
+		i = 0;
 	//printf("02\n");
-	logvalue(table, "prev last meal", table->prev->last_meal);
-	logvalue(table, "act last meal", table->last_meal);
-	logvalue(table, "next last meal", table->next->last_meal);
-	logvalue(table, "i", i);
-	pthread_mutex_lock(&(table->info->m_meal));
-	pthread_mutex_unlock(&(table->next->f_mutex));
-	pthread_mutex_unlock(&(table->f_mutex));
+	//logvalue(table, "prev last meal", table->prev->last_meal);
+	//logvalue(table, "act last meal", table->last_meal);
+	//logvalue(table, "next last meal", table->next->last_meal);
+	//logvalue(table, "i", i);
+	pthread_mutex_unlock(&(table->info->m_meal));
+	//pthread_mutex_unlock(&(table->next->f_mutex));
+	//pthread_mutex_unlock(&(table->f_mutex));
 	return (i);
 }
 
@@ -47,10 +52,13 @@ void	*waiter(void *arg)
 	table = (struct s_list*)arg;
 	while (1)
 	{
-		logvalue(table, "waiter", 0);
+		//logvalue(table, "waiter", 0);
 		pthread_mutex_lock(&(table->info->m_status));
 		if (table->status == 1 && permission_to_eat(table))
+		{
+			//logvalue(table, "PERM_TO_EAT", 1);
 			table->perm_to_eat = 1;
+		}
 		pthread_mutex_lock(&(table->info->m_meal));
 		if (table->status != 2 
 			&& (simul_time(table) - table->last_meal >= table->info->time_to_die))
@@ -93,6 +101,7 @@ void	alertsleep(suseconds_t timer, t_list *table)
 		if (table->info->stop_simul)
 		{
 			table->status = 0;
+			pthread_mutex_unlock(&(table->info->m_stop));
 			return ;
 		}
 		pthread_mutex_unlock(&(table->info->m_stop));
@@ -110,7 +119,7 @@ int	end_of_simulation(t_list *table)
 
 	value = 0;
 
-	logmessage(table, "end_of_simulation\n");
+	//logmessage(table, "end_of_simulation\n");
 	pthread_mutex_lock(&(table->info->m_stop));
 	if (table->info->stop_simul) //status == 0?
 		value = 1;
@@ -142,7 +151,8 @@ int	readyeat(t_list *table)
 	if (end_of_simulation(table))
 		return (value);
 	pthread_mutex_lock(&(table->info->m_status));
-	logvalue(table, "readyyeat", table->status);
+	//logvalue(table, "readyyeat", table->status);
+	//logvalue(table, "readyyeat perm", table->perm_to_eat);
 	if (table->status == 1 && table->perm_to_eat)
 	{
 		//eat;
@@ -159,7 +169,7 @@ int	readyeat(t_list *table)
 		logmessage(table, "is eating\n");
 		alertsleep(table->info->time_to_eat, table);
 		pthread_mutex_lock(&(table->info->m_meal));
-		printf("BROOOOWTF\n\n");
+		//printf("BROOOOWTF\n\n");
 		table->last_meal = simul_time(table);
 		pthread_mutex_unlock(&(table->info->m_meal));
 		pthread_mutex_unlock(&(table->next->f_mutex));
@@ -201,17 +211,11 @@ void	*routine(void* arg)
 		if (table->status == 0) //simulation ender or safisfied
 		{
 			pthread_mutex_unlock(&(table->info->m_status));
-			pthread_mutex_lock(&(table->info->m_write));
-			printf("CU\n");
-			pthread_mutex_unlock(&(table->info->m_write));
 			break ;
 		}
 		pthread_mutex_unlock(&(table->info->m_status));
 		usleep(100);
 	}
-	pthread_mutex_lock(&(table->info->m_write));
-	printf("ANOS\n");
-	pthread_mutex_unlock(&(table->info->m_write));
 	return (NULL);
 }
 
@@ -223,10 +227,9 @@ int	startroullete(t_list *table)
 	i = 0;
 	table->info->start_time = 0;
 	tmp = table;
-	printf("table->info->start_time: %ld\n", table->info->start_time);
 	while (i < table->info->number_of_philo)
 	{
-		printf("ID %d lastmeal: %ld\n", tmp->id, tmp->last_meal);
+		//printf("ID %d lastmeal: %ld\n", tmp->id, tmp->last_meal);
 		if (pthread_create(&(tmp->tid), NULL, &routine, tmp) != 0)
 			perror("FAILED TO CREATE THREAD\n");
 		tmp = tmp->next;
