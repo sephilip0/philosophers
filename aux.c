@@ -54,6 +54,8 @@ int	correctinput(int argc, char *argv[])
 	{
 		if (ft_atoi(argv[i]) < 1)
 		{
+			if (i == 5 && (ft_atoi(argv[i]) == 0))
+				break ;
 			printf("Wrong input\n");
 			return (0);
 		}
@@ -90,7 +92,6 @@ void	freelist(t_list **list, int nbr)
 	{
 		tmp = (*list);
 		(*list) = (*list)->next;
-		printf("DESTRUIDO MUTEX\n");
 		pthread_mutex_destroy(&(tmp->f_mutex));
 		free(tmp);
 		i++;
@@ -147,7 +148,6 @@ void	spinbottle(t_list *head)
 		head = head->next;
 		i++;
 	}
-	printf("now to back\n");
 	i = 0;
 	while (i < 20)
 	{
@@ -166,15 +166,10 @@ t_list	*initphil(t_phil *phil, int argc, char *argv[])
 	phil->time_to_eat = ft_atoi(argv[3]);
 	phil->time_to_sleep = ft_atoi(argv[4]);
 	phil->stop_simul = 0;
-	printf("M_PTE INIT\n");
 	pthread_mutex_init(&(phil->m_pte), NULL);
-	printf("M_STATUS INIT\n");
 	pthread_mutex_init(&(phil->m_hungry), NULL);
-	printf("M_WRITE INIT\n");
 	pthread_mutex_init(&(phil->m_write), NULL);
-	printf("M_MEAL INIT\n");
 	pthread_mutex_init(&(phil->m_meal), NULL);
-	printf("M_STOP INIT\n");
 	pthread_mutex_init(&(phil->m_stop), NULL);
 	if (argc == 6)
 		phil->times_to_satisfy = ft_atoi(argv[5]);

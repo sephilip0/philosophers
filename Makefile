@@ -1,6 +1,7 @@
 NAME = philo
 CC = cc
-CFLAGS = -Wall -Wextra -Werror -pthread
+# CFLAGS = -Wall -Wextra -Werror -g -pthread
+CFLAGS = -Wall -Wextra -Werror -g -fsanitize=thread -pthread
 
 OBJ_PATH = obj/
 
@@ -24,7 +25,7 @@ $(OBJ_PATH)%.o:%.c
 
 
 $(NAME): $(OBJS)
-	$(CC) $(FLAGS) $(OBJS) -o $(NAME)
+	$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
 #	we link them here
 
 clean:

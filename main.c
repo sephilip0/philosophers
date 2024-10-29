@@ -23,8 +23,8 @@ int	permission_to_eat(t_list *table)
 
 	i = 1;
 	
-	pthread_mutex_lock(&(table->info->m_meal));
 	pthread_mutex_lock(&(table->info->m_pte));
+	pthread_mutex_lock(&(table->info->m_meal));
 	if ((table->prev->perm_to_eat == 1) || (table->next->perm_to_eat == 1))
 		i = 0;
 	else if (table->prev->last_meal < table->last_meal
@@ -38,8 +38,8 @@ int	permission_to_eat(t_list *table)
 		logvalue(table, "last_meal: ", table->last_meal);
 		logvalue(table, "last_meal_next: ", table->next->last_meal);
 	}*/
-	pthread_mutex_unlock(&(table->info->m_pte));
 	pthread_mutex_unlock(&(table->info->m_meal));
+	pthread_mutex_unlock(&(table->info->m_pte));
 	return (i);
 }
 
@@ -56,7 +56,7 @@ void	*waiter(void *arg)
 			if (permission_to_eat(table))
 			{
 				pthread_mutex_lock(&(table->info->m_pte));
-			//	logvalue(table, "permtoeat", 1);
+				//logvalue(table, "permtoeat", 1);
 				table->perm_to_eat = 1;
 				pthread_mutex_unlock(&(table->info->m_pte));
 			}
@@ -66,9 +66,9 @@ void	*waiter(void *arg)
 		if (!(table->hungry == 0 && table->perm_to_eat == 1)
 		&& (simul_time(table) - table->last_meal >= table->info->time_to_die))
 		{
-			logvalue(table, "last_meal ", table->last_meal);
-			logvalue(table, "permtoeat? ", table->perm_to_eat);
-			logvalue(table, "hungry? ", table->hungry);
+			//logvalue(table, "last_meal ", table->last_meal);
+			//logvalue(table, "permtoeat? ", table->perm_to_eat);
+			//logvalue(table, "hungry? ", table->hungry);
 			pthread_mutex_unlock(&(table->info->m_meal));
 			pthread_mutex_unlock(&(table->info->m_pte));
 			pthread_mutex_unlock(&(table->info->m_hungry));
@@ -143,6 +143,7 @@ int	readyeat(t_list *table)
 	pthread_mutex_lock(&(table->info->m_pte));
 	if (table->perm_to_eat)
 	{
+		logvalue(table, "permissss", 1);
 		//table->perm_to_eat = 0;
 		pthread_mutex_unlock(&(table->info->m_pte));
 		pthread_mutex_lock(&(table->f_mutex));
@@ -150,18 +151,15 @@ int	readyeat(t_list *table)
 			pthread_mutex_lock(&(table->info->m_hungry));
 			table->hungry = 0;
 			pthread_mutex_unlock(&(table->info->m_hungry));
-		pthread_mutex_lock(&(table->info->m_meal));
-		logvalue(table, "LAST MEAL MAN ", table->last_meal);
-		pthread_mutex_unlock(&(table->info->m_meal));
 		logmessage(table, "has taken a left fork\n");
 		logmessage(table, "has taken a right fork\n");
 		logmessage(table, "is eating\n");
+			pthread_mutex_lock(&(table->info->m_meal));
+			table->last_meal = simul_time(table);
+			pthread_mutex_unlock(&(table->info->m_meal));
 		alertsleep(table->info->time_to_eat, table);
 		pthread_mutex_unlock(&(table->next->f_mutex));
 		pthread_mutex_unlock(&(table->f_mutex));
-		pthread_mutex_lock(&(table->info->m_meal));
-		table->last_meal = simul_time(table);
-		pthread_mutex_unlock(&(table->info->m_meal));
 			pthread_mutex_lock(&(table->info->m_pte));
 			table->perm_to_eat = 0;
 			pthread_mutex_unlock(&(table->info->m_pte));
@@ -179,7 +177,7 @@ int	readyeat(t_list *table)
 
 //hungry -1 = DEAD
 //hungry 0 = NOTHING
-//hunry 1 = THINKING and WANT TO EAT
+//hungry 1 = THINKING and WANT TO EAT
 void	*routine(void* arg)
 {
 	t_list	*table;
@@ -229,7 +227,6 @@ int	startroullete(t_list *table)
 	i = 0;
 	while (i < table->info->number_of_philo)
 	{
-		printf("FECHOU THREAD: %d\n", tmp->id);
 		if (pthread_join(tmp->tid, NULL) != 0)
 			perror("FAILED TO JOIN THREAD\n");
 		tmp = tmp->next;
