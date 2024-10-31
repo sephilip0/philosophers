@@ -46,7 +46,7 @@ typedef struct s_list
 suseconds_t	gettimems(void);
 suseconds_t	simul_time(t_list *table);
 void	logmessage(t_list *table, char *msg);
-int	permission_to_eat(t_list *table);
+void 	permission_to_eat(t_list *table);
 void	*waiter(void *arg);
 void	alertsleep(suseconds_t timer, t_list *table);
 void	*routine(void* arg);
@@ -56,7 +56,7 @@ size_t	ft_strlen(const char *s);
 int	ft_atoi(char *nbr);
 int	correctinput(int argc, char *argv[]);
 void	freelist(t_list **list, int nbr);
-t_list	*formlist(t_phil *phil);
+t_list	*formlist(t_phil *phil, int i);
 t_list	*initphil(t_phil *phil, int argc, char *argv[]);
 
 #endif // PHILO_H

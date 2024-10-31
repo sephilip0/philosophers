@@ -99,42 +99,44 @@ void	freelist(t_list **list, int nbr)
 	return ;
 }
 
-t_list	*formlist(t_phil *phil)
+void initnode(t_phil *phil, t_list **new, int i)
 {
-	int	i;
-	t_list	*new;
-	t_list	*prev;
-	t_list	*first;
+	(*new)->id = i;
+	(*new)->hungry = 1;
+	(*new)->perm_to_eat = 0;
+	(*new)->last_meal = 0;
+	(*new)->info = phil;
+	(*new)->info->start_time = 0;
+	pthread_mutex_init(&((*new)->f_mutex), NULL);
+}
 
-	i = 1;
-	prev = NULL;
-	first = NULL;
-	while (i <= phil->number_of_philo)
+t_list	*formlist(t_phil *phil, int i)
+{
+	t_list	*new;
+	t_list	*head;
+
+	head = NULL;
+	while (++i <= phil->number_of_philo)
 	{
 		new = malloc(sizeof(t_list));
 		if (!new)
 			return (freelist(&new, i - 1), NULL);
-		new->id = i;
-		new->hungry = 1;
-		new->perm_to_eat = 0;
-		new->last_meal = 0;
-		new->info = phil;
-		new->next = first;
-		new->prev = prev;
-		pthread_mutex_init(&(new->f_mutex), NULL);
-		if (!first)
-			first = new;
-		if (!prev)
-			prev = new;
+		initnode(phil, &new, i);
+		if (!head)
+		{
+			head = new;
+			new->next = new;
+			new->prev = new;
+		}
 		else
 		{
-			prev->next = new;
-			prev = new;
+			new->next = head;
+			new->prev = head->prev;
+			head->prev->next = new;
+			head->prev = new;
 		}
-		i++;
 	}
-	first->prev = new;
-	return (first);
+	return (head);
 }
 
 void	spinbottle(t_list *head)
@@ -175,7 +177,7 @@ t_list	*initphil(t_phil *phil, int argc, char *argv[])
 		phil->times_to_satisfy = ft_atoi(argv[5]);
 	else
 		phil->times_to_satisfy = 0;
-	table = formlist(phil);
+	table = formlist(phil, 0);
 	if (!table)
 		return (NULL);
 	//spinbottle(table);
